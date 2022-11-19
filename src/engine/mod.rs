@@ -61,9 +61,9 @@ impl DAWEngine {
 	}
 }
 
-/* ----------------
+/*
 	AUDIO BACKENDS
-   ---------------- */
+*/
 
 // SDL
 impl AudioCallback for DAWEngine {
@@ -73,6 +73,7 @@ impl AudioCallback for DAWEngine {
 		for chunk in out.chunks_mut(self.channels.into()) {
 			let sound = self.process();
 
+			// TODO adapt for multichannel
 			chunk[0] = sound[0];
 			chunk[1] = sound[1];
 		}
