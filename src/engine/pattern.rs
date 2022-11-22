@@ -1,6 +1,5 @@
-use super::playlist::PatternClip;
-
 // the Note enum is there solely for convenience's sake
+#[allow(dead_code)]
 enum Note {
 	// note table
 	C0, Cs0, D0, Ds0, E0, F0, Fs0, G0, Gs0, A0, As0, B0,
@@ -24,23 +23,27 @@ enum Note {
 
 type Row = Vec<Event>;
 pub struct Pattern {
-	rows: Vec<Row>
+	pub rows: Vec<Row>
 }
 
 impl Pattern {
-	fn to_clip(&self) -> PatternClip {
-		PatternClip {
-			pattern: self,
-			begin: 0,
-			end: todo!(),
-			offset: 0,
+	pub fn new(tracks_amount: u8, rows_amount: u8) -> Pattern {
+		let mut row: Row = Vec::with_capacity(tracks_amount as usize);
+		row.resize_with(tracks_amount as usize, || { Event { note: Note::None as u8, instrument: 0, volume: 128 } });
+
+		let mut rows: Vec<Row> = Vec::with_capacity(rows_amount as usize);
+		rows.resize_with(rows_amount as usize, || { row.clone() });
+
+		Pattern {
+			rows
 		}
 	}
 }
 
-struct Event {
-	note: u8,
-	instrument: u8, // 0 for empty
-	volume: u8 // MIDI velocity, range 0..=127
-	// effect: u8 // TODO effects
+#[derive(Clone, Copy)]
+pub struct Event {
+	pub note: u8,
+	pub instrument: u8, // 0 for empty
+	pub volume: u8 // MIDI velocity, range 0..=127; 128 = none
+	// pub effect: u8 // TODO effects
 }
