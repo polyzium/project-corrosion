@@ -117,7 +117,7 @@ impl DAWEngine {
 fn format_note(note: Note) -> String {
     match note {
         Note::None => return "...".to_string(),            // none
-        Note::PreviousChannel => return "<<<".to_string(), // prev channel
+        Note::PreviousTrack => return "<<<".to_string(), // prev channel
         Note::Off => return "Off".to_string(),             // off
         Note::Cut => return "Cut".to_string(),             // cut/choke
         Note::Fade => return "Fde".to_string(),            // fade

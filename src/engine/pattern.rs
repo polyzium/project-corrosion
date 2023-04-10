@@ -14,7 +14,7 @@ pub enum Note {
     C8, Cs8, D8, Ds8, E8, F8, Fs8, G8, Gs8, A8, As8, B8,
     C9, Cs9, D9, Ds9, E9, F9, Fs9, G9, Gs9, A9, As9, B9,
 
-    PreviousChannel, // for executing effects on the previous channel of the pattern, similar to what SunVox does
+    PreviousTrack, // for executing effects on the previous track of the pattern, similar to what SunVox does
 
     // commands
     Off = 128,
@@ -24,7 +24,7 @@ pub enum Note {
     None = 255,
 }
 
-type Row = Vec<Event>;
+type Row = Vec<TrackEvent>;
 pub struct Pattern {
     pub rows: Vec<Row>,
     pub rpb: u8, // rows per beat
@@ -35,7 +35,7 @@ pub struct Pattern {
 impl Pattern {
     pub fn new(tracks_amount: u8, rows_amount: u8) -> Pattern {
         let mut row: Row = Vec::with_capacity(tracks_amount as usize);
-        row.resize_with(tracks_amount as usize, || Event {
+        row.resize_with(tracks_amount as usize, || TrackEvent {
             note: Note::None,
             instrument: 0,
             volume: 128,
@@ -49,9 +49,9 @@ impl Pattern {
 }
 
 #[derive(Clone, Copy)]
-pub struct Event {
+pub struct TrackEvent {
     pub note: Note,
     pub instrument: u8, // 0 for empty
     pub volume: u8,     // MIDI velocity, range 0..=127; >= 128 is none
-                        // pub effect: u8 // TODO effects
+    // pub effect: u8   // TODO effects
 }

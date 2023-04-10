@@ -3,6 +3,7 @@ mod playlist;
 mod project;
 mod state;
 mod utils;
+mod plugins;
 
 use self::{
     pattern::Pattern,
@@ -10,7 +11,6 @@ use self::{
     project::Project,
     state::{PatternState, PlaylistState, State},
 };
-use sdl2::audio::AudioCallback;
 use std::io::Write;
 
 #[allow(dead_code)]
@@ -57,7 +57,7 @@ impl DAWEngine {
                 patterns: Vec::<PatternState>::new(),
             },
         };
-        engine.set_tempo(125);
+        engine.set_tempo(120);
         engine.add_pattern(Pattern::new(8, 64));
 
         // engine.pattern_play(engine.current_pattern, 1300);
@@ -114,11 +114,15 @@ impl DAWEngine {
         self.song_mode = song_mode;
     }
 
-    fn process(&mut self) -> &[f32] {
-        self.tick();
-
+    fn process(&mut self, buf: &mut [f32]) {
+        for _ in 0..(buf.len()/self.channels as usize) {
+            self.tick();
+        }
+        
         // TODO audio
-        &[1.0, -1.0]
+        /* for chunk in buf.chunks_mut(self.channels as usize) {
+            (chunk[0], chunk[1]) = (1.0, -1.0)
+        } */
     }
 }
 
@@ -126,18 +130,9 @@ impl DAWEngine {
     AUDIO BACKENDS
 */
 
-// SDL and CPAL
-impl AudioCallback for DAWEngine {
-    type Channel = f32;
-
-    fn callback(&mut self, out: &mut [f32]) {
-        for chunk in out.chunks_mut(self.channels.into()) {
-            let channels = self.channels as usize;
-            let sound = self.process();
-
-            for i in 0..channels {
-                chunk[i] = sound[i]
-            }
-        }
+// CPAL
+impl DAWEngine {
+    pub fn callback(&mut self, out: &mut [f32]) {
+        self.process(out)
     }
 }

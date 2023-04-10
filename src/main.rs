@@ -1,25 +1,10 @@
 use std::time::Duration;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use sdl2::audio::AudioCallback;
+use cpal::BufferSize::Fixed;
 
 mod engine;
 
-// SDL
-/* fn main() {
-    let daw = engine::DAWEngine::new(48000);
-
-    let sdl = sdl2::init().unwrap();
-    let audio = sdl.audio().unwrap();
-    let spec = sdl2::audio::AudioSpecDesired{ freq: Some(48000), channels: Some(2), samples: Some(512) };
-
-    let device = audio.open_playback(None, &spec, |_| { daw }).unwrap();
-    device.resume();
-
-    std::thread::sleep(Duration::from_secs(3))
-} */
-
-// CPAL
 fn main() {
     let samplerate = 48000;
     let channels = 2u8;
@@ -34,11 +19,13 @@ fn main() {
         .expect("Unable to query configs");
     // let supported_config = supported_configs_range.next().expect("No supported config found").with_max_sample_rate().into();
 
-    let config = supported_configs_range
+    let mut config: cpal::StreamConfig = supported_configs_range
         .find(|conf| conf.channels() == channels.into())
         .expect(&format!("Unable to find a {}-channel config", channels))
         .with_sample_rate(cpal::SampleRate(samplerate))
         .into();
+
+    config.buffer_size = Fixed(512);
 
     let stream = device
         .build_output_stream(
