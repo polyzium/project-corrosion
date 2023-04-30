@@ -245,19 +245,10 @@ impl Widget for PatternEditor {
                         if self.current_row != 0 {
                             self.current_row -= 1;
                         }
-
-                        if self.current_row < self.row_scroll {
-                            self.row_scroll -= 1;
-                        }
                     },
                     Keycode::Down => {
                         if self.current_row != self.pattern.as_ref().unwrap().rows.len()-1 {
                             self.current_row += 1;
-
-                            let row_capacity = self.pos2.y-self.pos1.y;
-                            if self.current_row > row_capacity-1 {
-                                self.row_scroll += 1;
-                            }
                         }
                     },
                     Keycode::Left => {
@@ -289,10 +280,28 @@ impl Widget for PatternEditor {
                             }
                         }
                     },
+                    Keycode::PageDown => {
+                        let row_capacity = self.pos2.y-self.pos1.y;
+                        let pat = self.pattern.as_ref().unwrap();
+
+                        self.current_row += row_capacity-1;
+                        if self.current_row > pat.rows.len()-1 {
+                            self.current_row = pat.rows.len()-1
+                        }
+                    },
+                    Keycode::PageUp => {
+                        let row_capacity = self.pos2.y-self.pos1.y;
+                        // let pat = self.pattern.as_ref().unwrap();
+
+                        self.current_row = self.current_row.saturating_sub(row_capacity-1);
+                        /* if self.current_row >  {
+                            self.current_row = pat.rows.len()-1
+                        } */
+                    },
                     Keycode::LCtrl | Keycode::RCtrl => {
                             self.ctrl_held = true;
                     },
-                    Keycode::Period => {
+                    Keycode::Period | Keycode::Delete => {
                         let event = &mut self.pattern.as_mut().unwrap()
                         .rows[self.current_row][self.current_track];
 
@@ -335,6 +344,13 @@ impl Widget for PatternEditor {
                     }
                 }
 
+                let row_capacity = self.pos2.y-self.pos1.y;
+                if self.current_row > self.row_scroll+row_capacity-1 {
+                    self.row_scroll = self.current_row-(row_capacity-1);
+                } else if self.current_row < self.row_scroll {
+                    self.row_scroll = self.current_row;
+                }
+
                 if matches!(key as u32, 0x4000004F..=0x40000052) { // arrows
                     temp_volume_get!(self);
                     self.changed = true;
@@ -372,11 +388,15 @@ impl Widget for PatternEditor {
                                     self.temp_volume = 0;
                                 }
 
-                                // let event = &mut self.pattern.as_mut().unwrap().rows[self.current_row][self.current_track];
                                 let tmp: u16 = push_digit(self.temp_volume, (char as u8)-48);
                                 self.temp_volume = truncate_number(tmp, 3);
 
-                                // self.changed = true;
+                                if self.temp_volume <= 127 {
+                                    let event = &mut self.pattern.as_mut().unwrap().rows[self.current_row][self.current_track];
+
+                                    event.volume = self.temp_volume as u8;
+                                    self.changed = true;
+                                }
                             },
                             _ => {}
                         }
