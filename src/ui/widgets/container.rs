@@ -3,6 +3,7 @@ use crate::any_impl;
 use super::Widget;
 
 const WIDGET_ID_CONTAINER: u8 = 2;
+const WIDGET_ID_PAGERCONTAINER: u8 = 6;
 
 pub struct Container {
     pub(crate) handles_events: bool,
@@ -61,7 +62,7 @@ pub struct PagerContainer {
 
 impl Widget for PagerContainer {
     fn type_id(&self) -> u8 {
-        WIDGET_ID_CONTAINER
+        WIDGET_ID_PAGERCONTAINER
     }
 
     fn draw(&mut self, canvas_channel: &std::sync::mpsc::Sender<crate::ui::Command>) {
