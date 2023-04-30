@@ -1,11 +1,15 @@
 use std::io::Write;
-
-use super::{pattern::Note, project::Project, DAWEngine};
+use super::{pattern::Note, project::Project, DAWEngine, plugins::interface::{TimedEvent, Event, NoteState}, allocate_note, free_note};
 
 pub struct State {
     pub playing: bool,
     pub playlist: PlaylistState,
     pub patterns: Vec<PatternState>,
+
+    // note: always initialize this field using Vec::with_capacity!
+    pub event_list: Vec<TimedEvent>,
+    pub notes: Vec<NoteState>,
+    pub next_note_id: usize
 }
 
 pub struct PlaylistState {
@@ -13,23 +17,31 @@ pub struct PlaylistState {
 }
 
 impl PlaylistState {
-    fn advance(&mut self) {
-        self.position += 1
-    }
-
     fn seek(&mut self, pos: u32) {
         // TODO stop/choke plugin voices for DAWEngine
         self.position = pos
     }
 }
 
-#[derive(Debug)]
+/* #[derive(Debug)]
+pub struct PatternNoteState {
+    track: usize,
+    instrument: usize,
+
+    note: Note,
+    pitch: f32, // in semitones, relative to current note
+    velocity: u8, // 0..=127
+} */
+
+#[derive(Clone, Debug)]
 pub struct PatternState {
-    pub pattern_index: usize,
+    // pub pattern_index: usize,
     pub(crate) ticks_passed: u16,
     // TODO set_rpb method for DAWEngine mutating Pattern's rpb and PatternState's row_length.
     // 2022-04-07: row_length has been moved from DAWEngine to here. See the comment in the Pattern struct (same reason)
     pub(crate) row_length: u32, // in ticks
+    pub(crate) note_ids: Vec<usize>,
+
     pub position: u32,          // in ticks
     pub playing: bool,
     pub row: u16,
@@ -53,13 +65,11 @@ impl DAWEngine {
         // TODO note off to all active voices
     }
 
-    pub fn pattern_tick(&mut self, index: usize) {
+    pub fn pattern_tick(&mut self, index: usize, sample_index: usize) {
         let state = &mut self.state.patterns[index];
         if !state.playing {
             return;
         }
-
-        let pat = &self.project.patterns[state.pattern_index];
 
         if state.ticks_passed as u32 == state.row_length {
             state.row += 1;
@@ -67,8 +77,8 @@ impl DAWEngine {
         }
 
         if state.ticks_passed == 0 {
-            if state.row as usize != pat.rows.len() {
-                self.pattern_play_row(index);
+            if state.row as usize != self.project.patterns[index].rows.len() {
+                self.pattern_play_row(index, sample_index);
             }
         }
 
@@ -77,7 +87,7 @@ impl DAWEngine {
         state.position += 1;
         state.ticks_passed += 1;
 
-        if state.position as usize >= pat.rows.len() * state.row_length as usize {
+        if state.position as usize >= self.project.patterns[index].rows.len() * state.row_length as usize {
             state.playing = false;
             state.position = 0;
             state.row = 0;
@@ -85,32 +95,93 @@ impl DAWEngine {
         }
     }
 
-    fn pattern_play_row(&self, index: usize) {
-        let state = &self.state.patterns[index];
+    fn pattern_play_row(&mut self, index: usize, sample_index: usize) {
+        let pat = &self.project.patterns[index];
 
-        let pat = &self.project.patterns[state.pattern_index];
-        let row = &pat.rows[state.row as usize];
-
-        // TODO note playback
-        // enjoy debug information for now
-        print!("{:0>2} | ", state.row);
-        for track in row.iter() {
-            print!(
-                "{} {:0>2} {} | ",
-                format_note(track.note),
-                if track.instrument == 0 {
-                    "..".to_string()
-                } else {
-                    track.instrument.to_string()
-                },
-                if track.volume > 127 {
-                    " ...".to_string()
-                } else {
-                    track.volume.to_string()
-                },
-            );
+        #[cfg(debug_assertions)]
+        {
+            print!("{:0>2} | ", self.state.patterns[index].row);
+            for track in &pat.rows[self.state.patterns[index].row as usize] {
+                print!(
+                    "{} {:0>2} {} | ",
+                    format_note(track.note),
+                    if track.instrument == 0 {
+                        "..".to_string()
+                    } else {
+                        track.instrument.to_string()
+                    },
+                    if track.volume > 127 {
+                        "...".to_string()
+                    } else {
+                        format!("{:0>3}", track.volume.to_string())
+                    },
+                );
+            }
+            print!("\n");
         }
-        print!("\n")
+
+        for (track, event) in pat.rows[self.state.patterns[index].row as usize].iter().enumerate() {
+            match event.note {
+                Note::PreviousTrack => todo!(),
+                Note::Off => {
+                    let note_state = self.state.notes[self.state.patterns[index].note_ids[track]];
+
+                    self.state.event_list.push(TimedEvent {
+                        instrument: note_state.instrument,
+                        position: sample_index as u32,
+                        event: Event::NoteOff {
+                            id: self.state.patterns[index].note_ids[track],
+                            key: note_state.key,
+                            vel: note_state.vel
+                        }
+                    });
+
+                    free_note(&mut self.state.notes, note_state.id);
+                },
+                // TODO events for these
+                // I'll probably end up removing them or something
+                Note::Cut => todo!(),
+                Note::Fade => todo!(),
+
+                Note::None => {},
+
+                // rest of the notes
+                _ => {
+                    let note = event.note as u8;
+                    let instrument = if event.instrument == 0 { self.state.notes[self.state.patterns[index].note_ids[track]].instrument } else { (event.instrument-1) as usize };
+
+                    let old_state = self.state.notes[self.state.patterns[index].note_ids[track]];
+                    let id = allocate_note(&mut self.state.notes, note, instrument, self.state.next_note_id);
+                    // DAW will allocate on the next ID (if free). We don't want to be using the same ID all over again.
+                    self.state.next_note_id = id+1;
+
+                    self.state.patterns[index].note_ids[track] = id;
+
+                    if self.state.notes[self.state.patterns[index].note_ids[track]].is_on {
+                        self.state.event_list.push(TimedEvent {
+                            instrument,
+                            position: sample_index as u32,
+                            event: Event::NoteOff {
+                                id: self.state.patterns[index].note_ids[track],
+                                key: old_state.key,
+                                vel: old_state.vel
+                            }
+                        });
+                    }
+
+                    self.state.event_list.push(TimedEvent {
+                        // remember, 0 is none
+                        instrument,
+                        position: sample_index as u32,
+                        event: Event::NoteOn {
+                            id,
+                            key: note,
+                            vel: if event.volume > 127 { 127 } else { event.volume },
+                        },
+                    })
+                },
+            }
+        }
     }
 }
 

@@ -1,6 +1,8 @@
-// the Note enum is there solely for convenience's sake
+use strum::FromRepr;
+
+#[repr(u8)]
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, FromRepr)]
 pub enum Note {
     // note table
     C0, Cs0, D0, Ds0, E0, F0, Fs0, G0, Gs0, A0, As0, B0,
@@ -25,6 +27,8 @@ pub enum Note {
 }
 
 type Row = Vec<TrackEvent>;
+
+#[derive(Clone)]
 pub struct Pattern {
     pub rows: Vec<Row>,
     pub rpb: u8, // rows per beat
@@ -55,3 +59,27 @@ pub struct TrackEvent {
     pub volume: u8,     // MIDI velocity, range 0..=127; >= 128 is none
     // pub effect: u8   // TODO effects
 }
+
+/* #[macro_export]
+macro_rules! test_pattern {
+    () => {
+        Pattern {
+            rows: vec![
+                vec![TrackEvent { note: Note::C5, instrument: 1, volume: 127 }],
+                vec![TrackEvent { note: Note::None, instrument: 0, volume: 255 }],
+                vec![TrackEvent { note: Note::C6, instrument: 1, volume: 127 }],
+                vec![TrackEvent { note: Note::C7, instrument: 1, volume: 127 }],
+                vec![TrackEvent { note: Note::C8, instrument: 1, volume: 127 }],
+        
+                vec![TrackEvent { note: Note::E5, instrument: 2, volume: 127 }],
+                vec![TrackEvent { note: Note::E5, instrument: 2, volume: 127 }],
+                vec![TrackEvent { note: Note::E5, instrument: 2, volume: 127 }],
+        
+                vec![TrackEvent { note: Note::G5, instrument: 4, volume: 63 }],
+                vec![TrackEvent { note: Note::G5, instrument: 4, volume: 63 }],
+                vec![TrackEvent { note: Note::G5, instrument: 4, volume: 63 }],
+            ],
+            rpb: 4,
+        }
+    };
+} */
