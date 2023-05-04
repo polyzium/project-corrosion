@@ -3,7 +3,7 @@ use std::mem;
 use std::panic::catch_unwind;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use cpal::SampleRate;
+use cpal::{SampleRate, BufferSize};
 use engine::pattern::Pattern;
 use sdl2::keyboard::Keycode;
 use ui::widgets::pattern_editor::PatternEditor;
@@ -11,6 +11,7 @@ use ui::widgets::{Position, fill_region};
 use ui::widgets::button::Button;
 use crate::init::{main_menu, default_kbd_mapping};
 use crate::ui::Command;
+use crate::ui::widgets::clock::Clock;
 use crate::ui::widgets::container::{PagerContainer, Container};
 use crate::ui::widgets::{draw_borders_inner_triangles_thin, Widget};
 use crate::ui::widgets::eventhook::EventHook;
@@ -53,10 +54,9 @@ fn main() {
     }));
 
     // Audio
-    let samplerate = 44100;
-    let channels = 2u8;
-
-    let daw = Arc::new(Mutex::new(engine::DAWEngine::new(samplerate, channels, 512)));
+    let mut samplerate = 48000;
+    let mut channels = 2u8;
+    let mut buffer_size = 512u32;
 
     let host = cpal::default_host();
     let device = host
@@ -69,23 +69,51 @@ fn main() {
         println!("{:?}", c);
     }
 
+    let mut config: cpal::StreamConfig;
+
     #[cfg(not(target_os = "windows"))]
-    let mut config: cpal::StreamConfig = supported_configs_range
-        .find(|conf| conf.channels() == channels.into())
-        .expect(&format!("Unable to find a {}-channel config", channels))
-        .with_sample_rate(cpal::SampleRate(samplerate))
-        .into();
+    {
+        config = supported_configs_range
+            .find(|conf| conf.channels() == channels.into())
+            .expect(&format!("Unable to find a {}-channel config", channels))
+            .with_sample_rate(cpal::SampleRate(samplerate))
+            .into();
+    }
 
     // Fix for windows
     #[cfg(target_os = "windows")]
-    let mut config: cpal::StreamConfig = supported_configs_range
-        .find(|conf| conf.channels() == channels.into())
-        .expect(&format!("Unable to find a {}-channel config with a samplerate of {}", channels, samplerate))
-        .with_max_sample_rate()
-        .into();
+    {
+        let found_config = supported_configs_range
+        .find(|conf| conf.channels() == channels.into() && conf.max_sample_rate() == cpal::SampleRate(samplerate) );
+        
+        if found_config.is_some() {
+            config = found_config.unwrap().with_max_sample_rate().into();
+        } else {
+            native_dialog::MessageDialog::new()
+            .set_type(native_dialog::MessageType::Warning)
+            .set_title("Configuration")
+            .set_text(&format!("Unable to find a {samplerate} Hz {channels}-channel audio configuration.\nUsing first available configuration instead.\n\nThis may cause issues. Please switch to a supported configuration whenever possible."))
+            .show_alert();
 
-    config.buffer_size = Fixed(512);
+            // The iterator must've consumed all elements at this point
+            supported_configs_range = device
+            .supported_output_configs()
+            .expect("Unable to query configs");
 
+            config = supported_configs_range
+            .find(|conf| { return true })
+            .expect(&format!("No configs!?"))
+            .with_max_sample_rate()
+            .into();
+        }
+
+        samplerate = config.sample_rate.0;
+        channels = config.channels as u8;
+    }
+
+    config.buffer_size = BufferSize::Fixed(buffer_size);
+
+    let daw = Arc::new(Mutex::new(engine::DAWEngine::new(samplerate, channels, buffer_size)));
     let daw_a = daw.clone();
 
     let stream = device
@@ -106,8 +134,8 @@ fn main() {
 
 
     // UI
-    let mut font = load_font_from_hex(File::open("unscii-8.hex").unwrap());
-    let ui_symbols = load_font_from_itf(File::open("font.cfg").unwrap());
+    let mut font = load_font_from_hex(File::open("font.hex").expect("font.hex not found! Please put an 8x8 font in HEX format and rename it to font.hex"));
+    let ui_symbols = load_font_from_itf(File::open("font.itf").expect("font.itf not found! Please put an 8x8 font in ITF format and rename it to font.itf"));
     for i in 128..=201 { // Impulse Tracker symbols region
         // Replace the arrows plane
         font[8464+i] = ui_symbols[i];
@@ -139,14 +167,14 @@ fn main() {
         ui_channel.send(Command::Text(start_x, start_y+4, 0, MAIN_COLOR, format!(
             "Using {}, {} Hz, {} samples",
             host.id().name(),
-            config.sample_rate.0,
+            samplerate,
             match config.buffer_size {
                 cpal::BufferSize::Default => "default number of".to_string(),
                 Fixed(smp) => format!("{smp}"),
             })));
         ui_channel.send(Command::Text(start_x, (start_y)+6, 0, 0xffff00, "\n This software is currently in the alpha stage of development. \n There may be bugs, glitches, crashes, and other unexpected issues.\n Use at your own risk.\n".to_string()));
         #[cfg(debug_assertions)]
-        ui_channel.send(Command::Text(start_x, (start_y)+11, 0, 0xff3f3f, "\n\n This is a development build. Do not use in production. \n".to_string()));
+        ui_channel.send(Command::Text(start_x, (start_y)+11, 0, 0xff3f3f, "\n\n This is a development build. Expect a major performance impact. \n".to_string()));
 
         ui.widgets.push(Box::new(Button::new(
             Position { x: ((start_x+end_x)/2)-(" Continue ".len()/2), y: end_y-2 },
@@ -238,11 +266,23 @@ fn main() {
     });
 
     let menu = Box::new(main_menu());
+    let clock = Box::new(Clock {
+        pos: Position { x: 0, y: 2 },
+        bg_color: 0,
+        color: 0xffffff,
+        beat_color: 0,
+        downbeat_color: 0,
+        ticks: 0,
+        ppq: daw.lock().unwrap().project.ppq,
+        flash_on_beat: false,
+        playing: false,
+    });
 
     pager.widgets.push(test);
     pager.widgets.push(pattern_container);
     ui.widgets.push(Box::new(pager));
     ui.widgets.push(menu);
+    ui.widgets.push(clock);
 
     let (events_tx, events_rx): (Sender<ui::events::Event>, Receiver<ui::events::Event>) = channel();
     ui.widgets.push(Box::new(EventHook {
@@ -254,13 +294,13 @@ fn main() {
     ui_channel.send(Command::Text((WIDTH/16)-(54/2), 1, 0, MAIN_COLOR, "Project Corrosion v0.0.0 (C) 2023 Polyzium Productions".to_string()));
 
     #[cfg(debug_assertions)]
-    ui_channel.send(Command::Text(0, 0, 0xffffff, 0xff0000, " DEBUG BUILD ".to_string()));
+    ui_channel.send(Command::Text(0, 0, 0xffffff, 0xff0000, " DEBUG BUILD. Not for daily use. ".to_string()));
 
     // Main UI loop
     while !ui.wants_to_quit() {
         let mut locked_daw = daw.lock().expect("UI thread: Unable to lock mutex on DAWEngine");
 
-        // Pattern Editor updater
+        // Pattern Editor
         {
             let pager = get_widget_mut!(ui.widgets[0], PagerContainer);
             let container = get_widget_mut!(pager.widgets[1], Container);
@@ -277,6 +317,17 @@ fn main() {
                 patview.state.as_mut().unwrap().playing = false;
             } */
         }
+
+        // Clock
+        {
+            let clock = get_widget_mut!(ui.widgets[2], Clock);
+
+            clock.playing = locked_daw.state.patterns[0].playing;
+            clock.ticks = locked_daw.state.patterns[0].position;
+            clock.ppq = locked_daw.project.ppq;
+        }
+        // We updated the widgets with necessary data, unlock the mutex
+        mem::drop(locked_daw);
 
         // Global event handler
         loop {
@@ -342,14 +393,17 @@ fn main() {
             break;
         });
         handle_menu!(menu.pages[init::MENU_PLAYBACK][0], { // Main -> Playback -> Play
+            let mut locked_daw = daw.lock().expect("UI thread: Unable to lock mutex on DAWEngine");
             locked_daw.state.playing = true;
             menu.close();
         });
         handle_menu!(menu.pages[init::MENU_PLAYBACK][1], { // Main -> Playback -> Pause
+            let mut locked_daw = daw.lock().expect("UI thread: Unable to lock mutex on DAWEngine");
             locked_daw.state.playing = false;
             menu.close();
         });
         handle_menu!(menu.pages[init::MENU_PLAYBACK][2], { // Main -> Playback -> Stop
+            let mut locked_daw = daw.lock().expect("UI thread: Unable to lock mutex on DAWEngine");
             locked_daw.state.playing = false;
             for state in &mut locked_daw.state.patterns {
                 state.playing = false;
@@ -366,8 +420,6 @@ fn main() {
 
         // Update the UI
         ui.poll();
-        // Unlock mutex before drawing
-        mem::drop(locked_daw);
         // Draw
         ui.update();
     }

@@ -33,7 +33,7 @@ pub const SINGLE_DASH: char = '\u{220A}'; // 8464+250
 pub const DOUBLE_DASH: char = '\u{21C8}'; // 8464+184
 pub const LEFT_SMALL_BRACKET: char = '\u{21CF}'; // 8464+191
 pub const RIGHT_SMALL_BRACKET: char = '\u{21D0}'; // 8464+192
-pub const ALMOST_FULL_BLOCK_PADDED_LEFT: char = '\u{21B8}'; // 8464+168
+pub const CENTERED_BORDER: char = '\u{21B8}'; // 8464+168
 pub const DOTTED_LINE: char = '\u{21AA}'; // 8464+154
 pub const DOUBLE_LINE: char = '\u{21DD}'; // 8464+205
 

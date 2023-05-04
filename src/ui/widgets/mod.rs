@@ -4,6 +4,7 @@ pub mod container;
 pub mod eventhook;
 pub mod menu;
 pub mod rulers;
+pub mod clock;
 
 use std::{sync::mpsc::{Sender, self}, any::Any};
 

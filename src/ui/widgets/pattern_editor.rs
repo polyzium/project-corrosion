@@ -1,7 +1,7 @@
 use std::{sync::mpsc, collections::HashMap};
 use sdl2::keyboard::Keycode;
 
-use crate::{ui::{Command, events::Event, glyph_indices::{ALMOST_FULL_BLOCK_PADDED_LEFT, CENTERED_DOT_THIN}, pixel_to_char}, engine::{pattern::{Pattern, Note}, state::PatternState}, any_impl};
+use crate::{ui::{Command, events::Event, glyph_indices::{CENTERED_BORDER, CENTERED_DOT_THIN}, pixel_to_char}, engine::{pattern::{Pattern, Note}, state::PatternState}, any_impl};
 
 use super::{Widget, Position, draw_borders_thick, fill_region};
 
@@ -204,7 +204,7 @@ impl Widget for PatternEditor {
                     canvas_channel.send(Command::Text(x+7, y, self.text_color, if self.current_column == COLUMN_VOLUME { bg } else if i == self.current_row { self.row_selection_color } else { row_bg }, vol_string));
                 }
 
-                canvas_channel.send(Command::Char(x+10, y, self.outer_bg, if i == self.current_row { self.row_selection_color } else { row_bg }, ALMOST_FULL_BLOCK_PADDED_LEFT));
+                canvas_channel.send(Command::Char(x+10, y, self.outer_bg, if i == self.current_row { self.row_selection_color } else { row_bg }, CENTERED_BORDER));
 
                 x += 11;
                 // If out of bounds to the right
