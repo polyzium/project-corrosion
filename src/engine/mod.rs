@@ -5,6 +5,7 @@ pub mod state;
 pub mod utils;
 pub mod plugins;
 mod test;
+pub mod mixer;
 
 use self::{
     playlist::Playlist,
@@ -114,6 +115,8 @@ impl DAWEngine {
 
         // engine.pattern_play(engine.current_pattern, 1300);
         // engine.pattern_play(engine.current_pattern, 48);
+
+        dbg!(engine.tick_length);
 
         engine
     }

@@ -12,7 +12,7 @@ pub struct Parameter {
 }
 
 pub struct TimedEvent {
-    pub instrument: usize,
+    pub module_index: usize,
 
     pub position: u32, // position in samples relative to start of the buffer
     pub event: Event

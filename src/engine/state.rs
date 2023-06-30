@@ -128,7 +128,7 @@ impl DAWEngine {
                     let note_state = self.state.notes[self.state.patterns[index].note_ids[track]];
 
                     self.state.event_list.push(TimedEvent {
-                        instrument: note_state.instrument,
+                        module_index: note_state.instrument,
                         position: sample_index as u32,
                         event: Event::NoteOff {
                             id: self.state.patterns[index].note_ids[track],
@@ -162,7 +162,7 @@ impl DAWEngine {
                     // TODO: replace this with is_free so that plugin APIs like CLAP can notify whenever it's free
                     if self.state.notes[self.state.patterns[index].note_ids[track]].is_on {
                         self.state.event_list.push(TimedEvent {
-                            instrument,
+                            module_index: instrument,
                             position: sample_index as u32,
                             event: Event::NoteOff {
                                 id: self.state.patterns[index].note_ids[track],
@@ -174,7 +174,7 @@ impl DAWEngine {
 
                     self.state.event_list.push(TimedEvent {
                         // remember, 0 is none
-                        instrument,
+                        module_index: instrument,
                         position: sample_index as u32,
                         event: Event::NoteOn {
                             id,
