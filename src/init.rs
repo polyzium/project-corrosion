@@ -90,5 +90,11 @@ pub fn default_kbd_mapping() -> HashMap<Keycode, Note> {
     insert_key!(map, J, As4);
     insert_key!(map, M, B4);
 
+    insert_key!(map, Comma, C5);
+    insert_key!(map, L, Cs5);
+    insert_key!(map, Period, D5);
+    insert_key!(map, Semicolon, Ds5);
+    insert_key!(map, Slash, E5);
+
     map
 }
