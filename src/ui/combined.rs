@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
+use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, EventPump, render::Canvas, video::Window};
 
 use super::{TextCanvas, widgets::Widget};
 
@@ -8,8 +8,8 @@ pub struct TextUI {
     pub canvas: TextCanvas,
     pub widgets: Vec<Box<dyn Widget>>,
 
-    pub sdl_canvas: sdl2::render::Canvas<sdl2::video::Window>,
-    sdl_event_pump: sdl2::EventPump,
+    pub sdl_canvas: Canvas<Window>,
+    sdl_event_pump: EventPump,
 
     wants_to_quit: bool,
 }
@@ -22,7 +22,6 @@ impl TextUI {
         let window = video_subsystem
             .window(title, width as u32, height as u32)
             .position_centered()
-            // .resizable()
             .build()
             .map_err(|e| e.to_string()).unwrap();
 
