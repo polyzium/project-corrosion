@@ -41,6 +41,7 @@ pub struct PatternState {
     // 2022-04-07: row_length has been moved from DAWEngine to here. See the comment in the Pattern struct (same reason)
     pub(crate) row_length: u32, // in ticks
     pub(crate) note_ids: Vec<usize>,
+    pub(crate) last_instrument: u8,
 
     pub position: u32,          // in ticks
     pub playing: bool,
@@ -148,7 +149,8 @@ impl DAWEngine {
                 // rest of the notes
                 _ => {
                     let note = event.note as u8;
-                    let instrument = if event.instrument == 0 { self.state.notes[self.state.patterns[index].note_ids[track]].instrument } else { (event.instrument-1) as usize };
+                    let instrument = if event.instrument == 0 { self.state.patterns[index].last_instrument as usize } else { (event.instrument-1) as usize };
+                    self.state.patterns[index].last_instrument = instrument as u8;
 
                     let old_state = self.state.notes[self.state.patterns[index].note_ids[track]];
                     let id = allocate_note(&mut self.state.notes, note, instrument, self.state.next_note_id);
@@ -157,6 +159,7 @@ impl DAWEngine {
 
                     self.state.patterns[index].note_ids[track] = id;
 
+                    // TODO: replace this with is_free so that plugin APIs like CLAP can notify whenever it's free
                     if self.state.notes[self.state.patterns[index].note_ids[track]].is_on {
                         self.state.event_list.push(TimedEvent {
                             instrument,
